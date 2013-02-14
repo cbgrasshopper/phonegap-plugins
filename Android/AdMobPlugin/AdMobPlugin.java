@@ -1,5 +1,6 @@
 package com.google.cordova.plugin;
 
+import android.location.Location;
 import com.google.ads.Ad;
 import com.google.ads.AdListener;
 import com.google.ads.AdRequest;
@@ -39,7 +40,10 @@ public class AdMobPlugin extends Plugin {
   private static final String ACTION_CREATE_BANNER_VIEW = "createBannerView";
   private static final String ACTION_REQUEST_AD = "requestAd";
 
-  /**
+  /** Publisher ID */
+  private String publisherId;
+
+    /**
    * This is the main method for the AdMob plugin.  All API calls go through here.
    * This method determines the action, and executes the appropriate call.
    *
@@ -75,8 +79,7 @@ public class AdMobPlugin extends Plugin {
    *         successfully.
    */
   private PluginResult executeCreateBannerView(JSONArray inputs) {
-    String publisherId;
-    String size;
+      String size;
 
     // Get the input data.
     try {
@@ -91,7 +94,7 @@ public class AdMobPlugin extends Plugin {
 
     // Create the AdView on the UI thread.
     return executeRunnable(new CreateBannerViewRunnable(
-        publisherId, adSizeFromSize(size)));
+            publisherId, adSizeFromSize(size)));
   }
 
   /**
@@ -217,10 +220,25 @@ public class AdMobPlugin extends Plugin {
         AdMobAdapterExtras extras = new AdMobAdapterExtras();
         Iterator<String> extrasIterator = inputExtras.keys();
         boolean inputValid = true;
+        Location location = null;
         while (extrasIterator.hasNext()) {
           String key = extrasIterator.next();
           try {
-            extras.addExtra(key, inputExtras.get(key));
+            if (key == "location")
+            {
+                JSONObject locationJSON = inputExtras.getJSONObject(key);
+                location = new Location(String.format("AdMobPlugin - %s", publisherId));
+                location.setLatitude(locationJSON.getDouble("latitude"));
+                location.setLongitude(locationJSON.getDouble("longitude"));
+                if (locationJSON.has("accuracy"))
+                {
+                    location.setAccuracy((float) locationJSON.getDouble("accuracy"));
+                }
+            }
+            else
+            {
+                extras.addExtra(key, inputExtras.get(key));
+            }
           } catch (JSONException exception) {
             Log.w(LOGTAG, String.format("Caught JSON Exception: %s", exception.getMessage()));
             result = new PluginResult(Status.JSON_EXCEPTION, "Error grabbing extras");
@@ -230,6 +248,10 @@ public class AdMobPlugin extends Plugin {
         if (inputValid) {
           extras.addExtra("cordova", 1);
           request.setNetworkExtras(extras);
+          if (location != null)
+          {
+              request.setLocation(location);
+          }
           adView.loadAd(request);
           result = new PluginResult(Status.OK);
         }
